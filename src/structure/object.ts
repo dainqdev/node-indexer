@@ -2,6 +2,7 @@ import { bcs, TypeTag } from "@mysten/sui/bcs";
 import { Data, MoveObject, MovePackage, Object, Owner, StructTag as CheckpointStructTag, TypeTag as CheckpointTypeTag, } from "../types/checkpoint";
 import { StructTag } from "../generator";
 import { WorkerParsedObject } from "../types/worker";
+import { convertStructTag } from "../lib/struct_tag";
 
 export enum ObjectChangeStatus {
   CREATED = "CREATED",
@@ -54,14 +55,7 @@ class SuiObject {
       return null;
     }
 
-    const structTag = object.data.Move.type_.Other;
-
-    return {
-      address: structTag.address,
-      module: structTag.module,
-      name: structTag.name,
-      typeParams: []
-    }
+    return convertStructTag(object.data.Move.type_.Other)
   }
 
   public static asParsed<T>(object: &Object, contents: T, status: ObjectChangeStatus): WorkerParsedObject<T> {

@@ -112,7 +112,11 @@ export class StructBuilder {
           ${fields}
         })
       });
-      export function is${type.name}(tag: StructTag) {
+      export function is${
+        type.name.endsWith("Struct") || type.name.endsWith("Event")
+          ? type.name
+          : `${type.name}Struct`
+      }(tag: StructTag) {
         return tag.address === '${type.address}' && tag.module === '${type.module}'
           && tag.name === '${type.name}'
       }`;

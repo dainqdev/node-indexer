@@ -1,12 +1,18 @@
 {
   "name": "node-indexer",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "main": "index.js",
   "license": "MIT",
   "scripts": {
     "build": "npx tsx src/build.ts && npx tsc",
     "dev": "npx tsx --expose-gc src/index.ts",
     "test": "node --expose-gc ./dist/test.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
   },
   "dependencies": {
     "@mysten/sui": "^1.34.0",

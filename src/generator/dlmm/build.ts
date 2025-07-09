@@ -25,5 +25,5 @@ export async function buildDLMM() {
     }
   }
 
-  await writeFile(path.join(process.cwd(), "src/", "dlmm.bcs.ts"), fileContent);
+  await writeFile(path.join(__dirname, "dlmm.bcs.ts"), fileContent);
 }

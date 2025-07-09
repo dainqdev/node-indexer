@@ -6,7 +6,7 @@ type RecordPartial<K extends keyof any, T> = {
   [P in K]?: T;
 };
 
-export type WorkerListenerIdentifier = "pairs_changed";
+export type WorkerListenerIdentifier = "pairs_changed" | 'positions_changed';
 
 export interface WorkerParsedObject<T> {
   id: string;

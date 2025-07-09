@@ -1,4 +1,7 @@
-import { LbPairTokenStruct } from "../generator";
+import { LbPairTokenStruct, LBPositionInfoStruct } from "../generator";
 
 const LbPair = LbPairTokenStruct()
-export type LbPairToken = typeof LbPair.$inferType
+const LbPostion = LBPositionInfoStruct()
+
+export type LbPairToken = (typeof LbPair.$inferType)['fields']
+export type LbPostion = (typeof LbPostion.$inferType)['fields']

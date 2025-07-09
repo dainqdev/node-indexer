@@ -7,14 +7,19 @@ import IndexerWorker, {
 import { Proxy } from "../lib/proxy";
 import { asyncForEach, forEach } from "../lib/js_core";
 import { CheckpointData } from "../types/checkpoint";
-import { TransactionHelper } from "../structure/checkpoint_data";
-import { isLBPair, LbPairTokenStruct, StructTag } from "../generator";
+import { ObjectDetail, TransactionHelper } from "../structure/checkpoint_data";
+import { isLBPairStruct, LbPairTokenStruct, StructTag } from "../generator";
 import SuiObject, { ObjectChangeStatus } from "../structure/object";
-import { LbPairToken } from "../types/dlmm";
+import { LbPairToken, LbPostion } from "../types/dlmm";
+import { isDynamicFields } from "../sui/native_bcs";
+import { isPositionInfo, DynamicLBPositionInfo } from "../sui/dlmm/lb_position";
+import logger from "../lib/logger";
+import { freemem } from "os";
 
 type WPO<T> = WorkerParsedObject<T>;
 type TxDetail = WorkerTransactionDetail;
 type Identifier = WorkerListenerIdentifier;
+type ChangeStatus = ObjectChangeStatus;
 export type PairChangeCallback = (
   pairs: WPO<LbPairToken>[],
   tx: TxDetail
@@ -27,46 +32,53 @@ class DlmmWorker extends IndexerWorker {
     );
 
     await asyncForEach(data.transactions, async (transaction) => {
-      const createdObjects = TransactionHelper.createdObjects(transaction);
-      const changedObjects = TransactionHelper.changedObjects(transaction);
+      const transactionDetail = TransactionHelper.detail(
+        transaction,
+        confirmedAt
+      );
+
       const pairsChanged: WPO<LbPairToken>[] = [];
+      const positionsChanged: WPO<LbPostion>[] = [];
 
-      forEach(createdObjects, (object) => {
+      let processObject = (object: ObjectDetail, status: ChangeStatus) => {
         const structTag = SuiObject.structTag(object);
 
         if (SuiObject.isObject(object) && structTag) {
-          if (isLBPair(structTag)) {
+          if (isLBPairStruct(structTag)) {
             const pairData: LbPairToken = LbPairTokenStruct().parse(
               new Uint8Array(object.data.Move.contents)
-            );
-            pairsChanged.push(
-              SuiObject.asParsed(object, pairData, ObjectChangeStatus.CREATED)
-            );
+            ).fields;
+            pairsChanged.push(SuiObject.asParsed(object, pairData, status));
           }
-        }
-      });
-      
-      forEach(changedObjects, (object) => {
-        const structTag = SuiObject.structTag(object);
 
-        if (SuiObject.isObject(object) && structTag) {
-          if (isLBPair(structTag)) {
-            const pairData: LbPairToken = LbPairTokenStruct().parse(
-              new Uint8Array(object.data.Move.contents)
-            );
-            pairsChanged.push(
-              SuiObject.asParsed(object, pairData, ObjectChangeStatus.CREATED)
-            );
-          }
+          // if (isPositionInfo(structTag)) {
+          //   const positionNodeData = DynamicLBPositionInfo().parse(
+          //     new Uint8Array(object.data.Move.contents)
+          //   );
+
+          //   positionsChanged.push(
+          //     SuiObject.asParsed(object, positionNodeData.value.fields, status)
+          //   );
+          // }
         }
-      });
+      };
+
+      forEach(TransactionHelper.createdObjects(transaction), (object) =>
+        processObject(object, ObjectChangeStatus.CREATED)
+      );
+
+      forEach(TransactionHelper.changedObjects(transaction), (object) =>
+        processObject(object, ObjectChangeStatus.MUTATED)
+      );
+
+      processObject = free()
 
       if (pairsChanged.length > 0) {
-        await this.#call(
-          "pairs_changed",
-          pairsChanged,
-          TransactionHelper.detail(transaction, confirmedAt)
-        );
+        await this.#call("pairs_changed", pairsChanged, transactionDetail);
+      }
+
+      if (positionsChanged.length > 0) {
+        await this.#call("positions_changed", positionsChanged, transactionDetail);
       }
     });
   }
@@ -80,5 +92,10 @@ class DlmmWorker extends IndexerWorker {
     return this._call(eventName, objects, tx);
   }
 }
+
+function free(): any {
+  return null;
+}
+
 
 export default DlmmWorker;

@@ -86,15 +86,16 @@ async function processCheckpoints(
 ) {
   const { concurency, interval, workers, storage } = config;
   const reader = readCheckpoints(checkpoint_num, concurency, interval / 10);
+
   for await (let data of reader) {
-    {
+    _handler_scope: {
       const checkpoint = DataProxy.from(data);
       data = free();
       await asyncForEach(workers, async (worker) => {
         await worker.processCheckpoint(checkpoint).catch((error) => {
           logger.error(
             error,
-            "[Process worker %s failed with checkpoint %s]",
+            "[%s]: Process failed with checkpoint %s",
             worker.constructor.name,
             checkpoint_num
           );

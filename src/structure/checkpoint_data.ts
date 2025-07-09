@@ -27,7 +27,7 @@ enum ObjectRemoveKind {
   Wrap = "Wrap",
 }
 
-type ObjectDetail = Object & { id: string; version: string };
+export type ObjectDetail = Object & { id: string; version: string };
 
 export class TransactionHelper {
   static detail(
