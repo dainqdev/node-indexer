@@ -49,7 +49,13 @@ class SuiObject {
     return object.data.Package.version;
   }
 
-  static structTag(structTag: CheckpointStructTag): StructTag {
+  static structTag(object: &Object): StructTag | null {
+    if (object.data.$kind !== 'Move' || object.data.Move.type_.$kind !== 'Other') {
+      return null;
+    }
+
+    const structTag = object.data.Move.type_.Other;
+
     return {
       address: structTag.address,
       module: structTag.module,

@@ -7,7 +7,7 @@ import { parseStructTag } from "@mysten/sui/utils";
 export async function buildDLMM() {
   const package_id = env.DLMM_PACKAGE_ID;
   const res = await StructBuilder.getPackage(package_id);
-  let fileContent = `import { normalizeStructTag, parseStructTag } from "@mysten/sui/utils";import { bcs, BcsType } from "@mysten/sui/bcs";export const CoinStruct = bcs.struct("Coin", { value: bcs.u64() });type StructTag = ReturnType<typeof parseStructTag>;`;
+  let fileContent = `import { normalizeStructTag, parseStructTag } from "@mysten/sui/utils";import { bcs, BcsType } from "@mysten/sui/bcs";export const CoinStruct = bcs.struct("Coin", { value: bcs.u64() });export  type StructTag = ReturnType<typeof parseStructTag>;`;
   // console.log('res', inspect(res, { depth: 100, colors: true }));
 
   for (const moduleName of Object.keys(res)) {
@@ -25,5 +25,5 @@ export async function buildDLMM() {
     }
   }
 
-  await writeFile(path.join(__dirname, "dlmm.bcs.ts"), fileContent);
+  await writeFile(path.join(process.cwd(), "src/", "dlmm.bcs.ts"), fileContent);
 }

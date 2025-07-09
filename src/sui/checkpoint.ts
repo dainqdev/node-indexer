@@ -9,7 +9,7 @@ export class Checkpoint {
     return Checkpoint.from(new Uint8Array(response.slice(1)));
   }
 
-  @Retry({ delay: 100 })
+  @Retry({ delay: 100, maxAttempts: 1000 })
   private static async getInternalheckpoint(sequence_number: number) {
     return await fetch(
       `https://checkpoints.mainnet.sui.io/${sequence_number}.chk`,

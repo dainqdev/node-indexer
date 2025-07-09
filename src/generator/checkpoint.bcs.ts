@@ -3,7 +3,10 @@ import { inspect } from 'util';
 
 export type SuiTypesYaml = Record<string, any> | string;
 
-const ALL_TYPE: Record<string, BcsType<any>> = {};
+let ALL_TYPE: {
+  version: string;
+  types: Record<string, BcsType<any>>
+};
 
 type SuiTypeCheck = SuiTypesYaml
 
@@ -148,15 +151,21 @@ function exportEnumField(type: SuiTypeCheck) {
   return [keys[0], type[keys[0] as keyof SuiTypeCheck]] as const
 }
 
-export function loadTypesFromYaml(yaml: SuiTypesYaml) {
+export function loadTypesFromYaml(version: string, yaml: SuiTypesYaml) {
   const types = Object.keys(yaml);
+  const new_record: Record<string, BcsType<any>> = {};
   for (const type of types) {
-    const typeStruct = getType(type, yaml[type as keyof SuiTypesYaml] as SuiTypeCheck, ALL_TYPE)
-    ALL_TYPE[type] = typeStruct;
+    const typeStruct = getType(type, yaml[type as keyof SuiTypesYaml] as SuiTypeCheck, new_record)
+    new_record[type] = typeStruct;
   }
-  return ALL_TYPE;
+
+  ALL_TYPE = {
+    version: version,
+    types: new_record
+  };
+  return new_record;
 }
 
 export function CheckpointDataStruct() {
-  return ALL_TYPE['CheckpointData']
+  return ALL_TYPE.types['CheckpointData']
 }

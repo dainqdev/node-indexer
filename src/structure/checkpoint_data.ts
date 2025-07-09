@@ -2,7 +2,7 @@ import { toBase58 } from "@mysten/sui/utils";
 import { map } from "../lib/js_core";
 import {
   CheckpointTransaction,
-  Object,
+  type Object,
   ObjectDigest,
   ObjectID,
   SequenceNumber,
@@ -30,12 +30,15 @@ enum ObjectRemoveKind {
 type ObjectDetail = Object & { id: string; version: string };
 
 export class TransactionHelper {
-  static detail(transaction: CheckpointTransaction, confirmedAt: Date): WorkerTransactionDetail {
+  static detail(
+    transaction: CheckpointTransaction,
+    confirmedAt: Date
+  ): WorkerTransactionDetail {
     return {
       digest: this.digest(transaction.effects),
       status: this.status(transaction.effects),
-      confirmedAt
-    }
+      confirmedAt,
+    };
   }
 
   static removedObjects(transaction: CheckpointTransaction) {
@@ -69,15 +72,44 @@ export class TransactionHelper {
         version,
       };
     }) as ObjectDetail[];
-    console.log('outputObjects', createdObjectRefs);
-    
-    const objectInputMap = arrayToMap(outputObjects, ["id", "version"]);
+
+    const objectOutputMap = arrayToMap(outputObjects, ["id", "version"]);
+
     return map(createdObjectRefs, ([objectId, version]) => {
-      const object = objectInputMap[`${objectId}_${version}`];
+      const object = objectOutputMap[`${objectId}_${version}`];
       if (object) {
         return object;
       } else {
-        throw new Error("created objects should show up in output objects");
+        throw new Error(
+          `created object ${objectId} should show up in output objects in tx ${this.digest(transaction.effects)}`
+        );
+      }
+    });
+  }
+  
+  static changedObjects(transaction: CheckpointTransaction) {
+    const createdObjectRefs = this.mutated(transaction.effects);
+    const outputObjects = map(transaction.output_objects, (object) => {
+      const id = SuiObject.id(object);
+      const version = SuiObject.version(object);
+
+      return {
+        ...object,
+        id,
+        version,
+      };
+    }) as ObjectDetail[];
+
+    const objectOutputMap = arrayToMap(outputObjects, ["id"]);
+
+    return map(createdObjectRefs, ([objectId]) => {
+      const object = objectOutputMap[objectId];
+      if (object) {
+        return object;
+      } else {
+        throw new Error(
+          `changed object ${objectId} should show up in output objects in tx ${this.digest(transaction.effects)}`
+        );
       }
     });
   }
@@ -101,7 +133,7 @@ export class TransactionHelper {
 
     return effects.V2.status;
   }
-  
+
   static digest(effects: TransactionEffects) {
     if (effects.$kind === "V1") {
       return effects.V1.transaction_digest;
@@ -115,6 +147,14 @@ export class TransactionHelper {
       return this.createdV1(effects.V1);
     } else {
       return this.createdV2(effects.V2);
+    }
+  }  
+  
+  private static mutated(effects: TransactionEffects) {
+    if (effects.$kind === "V1") {
+      return this.mutatedV1(effects.V1);
+    } else {
+      return this.mutatedV2(effects.V2);
     }
   }
 
@@ -135,6 +175,10 @@ export class TransactionHelper {
   }
 
   private static createdV1(effects: TransactionEffectsV1): ObjectRef[] {
+    return effects.created.map((v) => v[0]);
+  }
+  
+  private static mutatedV1(effects: TransactionEffectsV1): ObjectRef[] {
     return effects.created.map((v) => v[0]);
   }
 
@@ -159,7 +203,30 @@ export class TransactionHelper {
           output_state.$kind === "PackageWrite" &&
           id_operation.$kind === "Created"
         ) {
-          return [id, effects.lamport_version, output_state.PackageWrite[1]];
+          return [id, output_state.PackageWrite[0], output_state.PackageWrite[1]];
+        }
+
+        return null;
+      }
+    ).filter((t) => !!t) as ObjectRef[];
+  }
+
+  private static mutatedV2(effects: TransactionEffectsV2): ObjectRef[] {
+    return map(
+      effects.changed_objects,
+      ([id, { input_state, output_state }]) => {
+        if (
+          input_state.$kind == "Exist" &&
+          output_state.$kind === "ObjectWrite"
+        ) {
+          return [id, effects.lamport_version, output_state.ObjectWrite[0]];
+        }
+
+        if (
+          input_state.$kind == "Exist" &&
+          output_state.$kind === "PackageWrite"
+        ) {
+          return [id, output_state.PackageWrite[0], output_state.PackageWrite[1]];
         }
 
         return null;
@@ -211,7 +278,7 @@ function arrayToMap<T extends Record<string, any>, K extends keyof T>(
   key: K[]
 ) {
   return arr.reduce(
-    (p, v) => ((p[key.map(k => v[k]).join("_")] = v), p),
+    (p, v) => ((p[key.map((k) => v[k]).join("_")] = v), p),
     {} as Record<string, T>
   );
 }
