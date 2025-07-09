@@ -1,6 +1,6 @@
-import { getCheckpointDataType } from "../generator";
+import { CheckpointDataStruct, AddLiquidityEvent } from "../generator";
 import { Retry } from "../lib/retry";
-import { CheckpointData } from "../types/sui";
+import { CheckpointData } from "../types/checkpoint";
 
 //162687969
 export class Checkpoint {
@@ -26,11 +26,15 @@ export class Checkpoint {
   }
 
   static from(bytes: Uint8Array) {
-    const parser = getCheckpointDataType();
+    const parser = CheckpointDataStruct();
     if (!parser) {
       throw new Error("Cannot find checkpoint parser");
     }
 
     return parser.parse(bytes) as CheckpointData;
+  }
+
+  static allObjectsChange() {
+    AddLiquidityEvent
   }
 }

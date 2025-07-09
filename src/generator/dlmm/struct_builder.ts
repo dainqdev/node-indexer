@@ -6,7 +6,6 @@ import {
   SuiMoveNormalizedType,
   SuiMoveStructTypeParameter,
 } from "@mysten/sui/client";
-import { bcs, BcsType } from "@mysten/sui/bcs";
 import { inspect } from "util";
 
 type StructTag = ReturnType<typeof parseStructTag>;
@@ -112,8 +111,12 @@ export class StructBuilder {
         fields: bcs.struct("${type.name}Fields", {
           ${fields}
         })
-      })`;
-  
+      });
+      export function is${type.name}(tag: StructTag) {
+        return tag.address === '${type.address}' && tag.module === '${type.module}'
+          && tag.name === '${type.name}'
+      }`;
+
       return removeBreakline(generated);
     }
 

@@ -1,12 +1,29 @@
 import { Worker } from "node:worker_threads";
 import logger from "./lib/logger";
-import { pipeStreamGenerator } from "./lib/pipe";
 import { Checkpoint } from "./sui/checkpoint";
-import { CheckpointData } from "./types/sui";
+import { CheckpointData } from "./types/checkpoint";
 import { sleep } from "./lib/retry";
+import IndexerWorker from "./types/worker";
+import DataProxy, { Proxy } from "./lib/proxy";
+import { suiClient } from "./lib/sui";
+import { asyncForEach } from "./lib/js_core";
 
-export default async function setup_single_flow(concurency: number, interval = 100) {
-  let checkpoint_num = 163392923;
+export type ScanSetupParams<T extends IndexerWorker> = {
+  concurency: number;
+  interval?: number;
+  inititalCheckpoint?: number;
+  workers: T[];
+};
+
+export default async function setupScanFlow<T extends IndexerWorker>({
+  concurency,
+  interval = 100,
+  workers,
+  inititalCheckpoint,
+}: ScanSetupParams<T>) {
+  let checkpoint_num =
+    inititalCheckpoint ??
+    Number(await suiClient.getLatestCheckpointSequenceNumber());
   let last_checkpoint_num = checkpoint_num;
   let real_checkpoint_num = checkpoint_num;
 
@@ -19,28 +36,46 @@ export default async function setup_single_flow(concurency: number, interval = 1
   }, 10000);
 
   while (true) {
-    await processCheckpoints(checkpoint_num, concurency, interval, async (data) => {
-      logger.info("checkpoint: %s", data.checkpoint_summary.data.sequence_number)
-      real_checkpoint_num++
-    });
+    await processCheckpoints(
+      checkpoint_num,
+      concurency,
+      interval,
+      workers,
+      () => real_checkpoint_num++
+    );
 
     checkpoint_num += concurency;
-    await sleep(interval)
+    await sleep(interval);
   }
 }
 
-async function processCheckpoints(
+async function processCheckpoints<T extends IndexerWorker>(
   checkpoint_num: number,
-  concurency: number, interval = 100,
-  callback: (data: CheckpointData) => Promise<void>
+  concurency: number,
+  interval = 100,
+  workers: T[],
+  onDone?: () => void
 ) {
   const reader = readCheckpoints(checkpoint_num, concurency, interval / 10);
-  for await (const data of reader) {
-    callback(data);
+  for await (let data of reader) {
+    {
+      const checkpoint = DataProxy.from(data);
+      data = free(data);
+      await asyncForEach(workers, async (worker) => {
+        await worker.processCheckpoint(checkpoint)
+      })
+      checkpoint.free();
+      gc?.();
+    }
+    onDone?.();
   }
 }
 
-async function* readCheckpoints(checkpoint_num: number, concurency: number, interval = 100) {
+async function* readCheckpoints(
+  checkpoint_num: number,
+  concurency: number,
+  interval = 100
+) {
   const promises: (Promise<{
     data: CheckpointData;
     index: number;
@@ -51,10 +86,16 @@ async function* readCheckpoints(checkpoint_num: number, concurency: number, inte
   let length = concurency;
 
   while (length > 0) {
-    let { data, index } = await Promise.race(promises.filter(t => t !== null));
-    promises[index] = null
+    let { data, index } = await Promise.race(
+      promises.filter((t) => t !== null)
+    );
+    promises[index] = null;
     length--;
     yield data;
-    await sleep(interval)
+    await sleep(interval);
   }
+}
+
+function free<T>(value: T) {
+  return null as T;
 }
