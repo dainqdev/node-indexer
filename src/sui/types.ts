@@ -1,5 +1,5 @@
 import { parse } from "yaml";
-import { loadTypesFromYaml, SuiTypesYaml } from "../generator";
+import { loadTypesFromYaml, SuiTypesYaml } from "../generator/checkpoint.bcs";
 import { SUI_VERSION } from "../envs/env";
 import logger from "../lib/logger";
 
